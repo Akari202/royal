@@ -3,11 +3,13 @@ name = "royal"
 version = "0.1.0"
 edition = "2021"
 authors = ["Akari Harada <akaritwo0two@gmail.com>"]
+repository = "https://github.com/Akari202/royal"
 license = "GPL-3"
 
 
 [dependencies]
 rayon = "1.8.0"
 nom = "7.1.2"
+logos = "0.13.0"
 
 
