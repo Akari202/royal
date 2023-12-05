@@ -11,5 +11,10 @@ license = "GPL-3"
 rayon = "1.8.0"
 nom = "7.1.2"
 logos = "0.13.0"
+rand = "0.8.5"
+lalrpop-util = "0.20.0"
+
+[build-dependencies]
+lalrpop = "0.20.0"
 
 

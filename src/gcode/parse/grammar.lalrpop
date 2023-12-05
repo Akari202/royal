@@ -1,0 +1,38 @@
+use crate::gcode::{lex::tokens::Token, lex::LexicalError, ast};
+
+grammar;
+
+extern {
+  type Location = usize;
+  type Error = LexicalError;
+
+  enum Token {
+    "%" => Token::StartBlock,
+    ";" => Token::EndOfBlock,
+    "ONumber" => Token::ONumber(<usize>),
+    "LineNumber" => Token::LineNumber(<usize>),
+    "LetterCode" => Token::LetterCode(<Range<usize>>),
+    "Integer" => Token::Integer(<usize>),
+    "Variable" => Token::Variable(<usize>),
+    "Comment" => Token::Comment,
+    "[" => Token::LeftBracket,
+    "]" => Token::RightBracket,
+    "{" => Token::LeftCurly,
+    "}" => Token::RightCurly,
+    "==" => Token::LogicalEquals,
+    "!=" => Token::LogicalNotEquals,
+    "<" => Token::LogicalLessThan,
+    "<=" => Token::LogicalLessThanOrEquals,
+    ">" => Token::LogicalGreaterThan,
+    ">=" => Token::LogicalGreaterThanOrEquals,
+    "&&" => Token::LogicalAnd,
+    "||" => Token::LogicalOr,
+    "!|" => Token::LogicalXor,
+    "+" => Token::MathematicalAdd,
+    "-" => Token::MathematicalSubtract,
+    "*" => Token::MathematicalMultiply,
+    "/" => Token::MathematicalDivide,
+    "**" => Token::MathematicalPower,
+    "%" => Token::MathematicalModulo
+  }
+}
