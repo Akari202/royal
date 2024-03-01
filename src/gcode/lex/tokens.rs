@@ -1,5 +1,4 @@
 use std::fmt;
-use std::ops::Range;
 use logos::Logos;
 
 #[derive(Logos, Debug, PartialEq)]
@@ -11,7 +10,7 @@ use logos::Logos;
 pub enum Token {
     #[token(r"%", priority = 3)]
     StartBlock,
-    #[token(r"\n", priority = 3)]
+    #[token("\n", priority = 3)]
     #[token(r";", priority = 3)]
     EndOfBlock,
     #[regex(r"X(?&float)", |lex| lex.slice()[1..].parse::<f64>().map_err(|_| ()), priority = 3)]

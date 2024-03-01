@@ -1,6 +1,8 @@
 use std::error::Error;
 use std::fmt::{Debug, Display};
+use log::{debug, info};
 use logos::Logos;
+use vec_utils::vec3d::Vec3d;
 use crate::gcode::lex::tokens::Token;
 use crate::gcode::lex::tokens::Token::*;
 
@@ -37,6 +39,7 @@ enum DistanceMode {
 
 impl Program {
     pub fn from_file(input: &str) -> Result<Self, Box<dyn Error>> {
+        let perf_start = std::time::Instant::now();
         let mut lex = Token::lexer(input);
         let mut program: Program = Program::new();
         let mut point: Point = Point::new();
@@ -44,11 +47,14 @@ impl Program {
         loop {
             if let Some(token) = lex.next() {
                 if let Ok(token) = token {
+                    debug!("Token: {}", token);
                     match token {
                         StartBlock => { },
                         EndOfBlock => {
-                            point.check()?;
-                            program.push(point);
+                            if point.is_initialized() {
+                                point.check()?;
+                                program.push(point);
+                            }
                         },
                         XPoint(x) => {
                             if distance_mode == DistanceMode::Absolute {
@@ -86,6 +92,7 @@ impl Program {
                 break;
             }
         }
+        info!("Parsing program took: {:?}", perf_start.elapsed());
         Ok(program)
     }
 }
@@ -113,7 +120,19 @@ impl Point {
         }
     }
 
-    fn set_type(&mut self, point_type: PointType) {
+    pub fn from_vec3d(v: Vec3d) -> Self {
+        Self {
+            x: v.x,
+            y: v.y,
+            z: v.z,
+            i: None,
+            j: None,
+            k: None,
+            point_type: PointType::None
+        }
+    }
+
+    pub(crate) fn set_type(&mut self, point_type: PointType) {
         match point_type {
             PointType::ArcCW | PointType::ArcCCW => {
                 self.point_type = point_type;
@@ -145,6 +164,12 @@ impl Point {
             self.k = Some(self.z + self.k.unwrap());
             Ok(())
         }
+    }
+
+    fn is_initialized(&self) -> bool {
+        self.x != 0.0 || self.y != 0.0 || self.z != 0.0 ||
+            self.i != None || self.j != None || self.k != None ||
+            self.point_type != PointType::None
     }
 
     pub fn distance(&self, other: &Point) -> f64 {
@@ -181,6 +206,12 @@ impl Point {
     }
 }
 
+pub fn scalar_triple_product(p1: &Point, p2: &Point, p3: &Point) -> f64 {
+    p1.x * (p2.y * p3.z - p3.y * p2.z) -
+        p1.y * (p2.x * p3.z - p3.x * p2.z) +
+        p1.z * (p2.x * p3.y - p3.x * p2.y)
+}
+
 impl Display for Program {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for point in &self.points {
@@ -196,3 +227,8 @@ impl Display for Point {
             self.x, self.y, self.z, self.i, self.j, self.k, self.point_type)
     }
 }
+
+pub fn vec_from_point(p1: &Point) -> Vec3d {
+    Vec3d::new(p1.x, p1.y, p1.z)
+}
+
