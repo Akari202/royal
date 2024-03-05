@@ -7,9 +7,7 @@ pub fn filter_collinear_lines(program: &mut Program) {
     let perf_start = std::time::Instant::now();
     let mut pop_indices: Vec<usize> = Vec::new();
     let mut previous_points = (program.points[0], program.points[1]);
-    let mut point_iter = program.points.iter_mut().enumerate();
-    point_iter.next();
-    point_iter.next();
+    let mut point_iter = program.points.iter_mut().enumerate().skip(2);
     for (i, point) in point_iter {
         if point.point_type == previous_points.0.point_type && point.point_type == previous_points.1.point_type {
             match point.point_type {

@@ -3,15 +3,14 @@ use log::info;
 use vec_utils::matrix::matrix4x4;
 use vec_utils::quat::Quat;
 use vec_utils::vec3d::Vec3d;
-use crate::gcode::filter::{ARC_TOLERANCE, linear, remove_indices};
-use crate::gcode::points::{scalar_triple_product, Point, PointType, Program, vec_from_point};
+use crate::gcode::filter::{ARC_MAX_RADIUS, ARC_MIN_RADIUS, ARC_TOLERANCE, linear, remove_indices};
+use crate::gcode::points::{scalar_triple_product, Point, PointType, Program, vec_from_point, vec_from_point_center};
 
 pub fn filter_duplicate_arcs(program: &mut Program) {
     let perf_start = std::time::Instant::now();
     let mut pop_indices: Vec<usize> = Vec::new();
     let mut previous_point = program.points[0];
-    let mut point_iter = program.points.iter_mut().enumerate();
-    point_iter.next();
+    let mut point_iter = program.points.iter_mut().enumerate().skip(1);
     for (i, point) in point_iter {
         if point.point_type == previous_point.point_type {
             match point.point_type {
@@ -28,6 +27,46 @@ pub fn filter_duplicate_arcs(program: &mut Program) {
     }
     remove_indices(program, &pop_indices);
     info!("Duplicate arc filtering took: {:?} and removed {} blocks", perf_start.elapsed(), pop_indices.len());
+}
+
+pub fn fit_arcs(program: &mut Program) -> Result<(), Box<dyn Error>> {
+    let perf_start = std::time::Instant::now();
+    let mut pop_indices: Vec<usize> = Vec::new();
+    let mut previous_points = (program.points[0], program.points[1]);
+    let mut point_iter = program.points.iter_mut().enumerate().skip(2);
+    for (i, point) in point_iter {
+        if previous_points.1.point_type == point.point_type {
+            match point.point_type {
+                PointType::Feed | PointType::Rapid => {
+                    let fitted_arc = fit_arc(&previous_points.0, &previous_points.1, point);
+                    match fitted_arc {
+                        Ok(fitted_arc) => {
+                            let radius = fitted_arc.arc_radius()?;
+                            if radius < ARC_MIN_RADIUS || radius > ARC_MAX_RADIUS {
+                                continue;
+                            }
+                            let v1 = vec_from_point(&previous_points.0);
+                            let v2 = vec_from_point(&previous_points.1);
+                            let v3 = vec_from_point(point);
+                            let center = vec_from_point_center(&fitted_arc)?;
+                            let error1 = radius - point_to_line_distance(&center, &v1, &v2);
+                            let error2 = radius - point_to_line_distance(&center, &v2, &v3);
+                            if error1 < ARC_TOLERANCE && error2 < ARC_TOLERANCE{
+                                pop_indices.push(i - 1);
+                                continue;
+                            }
+                        },
+                        Err(_) => { }
+                    }
+                },
+                _ => { }
+            }
+        }
+        previous_points = (previous_points.1, *point);
+    }
+    remove_indices(program, &pop_indices);
+    info!("Arc fitting took: {:?} and removed {} blocks", perf_start.elapsed(), pop_indices.len());
+    Ok(())
 }
 
 fn similar_circles(p1: &Point, p2: &Point) -> bool {
@@ -53,7 +92,7 @@ fn min_max_radius(program: &Program) -> (f64, f64) {
     (min_radius, max_radius)
 }
 
-fn fit_arc(p1: &Point, p2: &Point, p3: &Point) -> Result<(Point), Box<dyn Error>> {
+fn fit_arc(p1: &Point, p2: &Point, p3: &Point) -> Result<Point, Box<dyn Error>> {
     if p2.point_type != PointType::Rapid && p2.point_type != PointType::Feed ||
         p3.point_type != PointType::Rapid && p3.point_type != PointType::Feed {
         Err("Middle and end points must be a rapid or feed motion")?
@@ -113,5 +152,14 @@ fn fit_arc(p1: &Point, p2: &Point, p3: &Point) -> Result<(Point), Box<dyn Error>
     point.k = Some(center.z);
     Ok(point)
 }
+
+fn point_to_line_distance(point: &Vec3d, l1: &Vec3d, l2: &Vec3d) -> f64 {
+    let d = (l2 - l1).normalize();
+    let v = point - l1;
+    let t = v.dot(&d);
+    let p = l1 + t * d;
+    p.distance_to(point)
+}
+
 
 

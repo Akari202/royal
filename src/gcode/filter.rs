@@ -1,11 +1,11 @@
-use log::{info, warn};
+use log::{debug, info, warn};
 use crate::gcode::points::Program;
 
 mod linear;
 mod arc;
 
-const LINEAR_TOLERANCE: f64 = 0.0001;
-const ARC_TOLERANCE: f64 = 0.0001;
+const LINEAR_TOLERANCE: f64 = 0.001;
+const ARC_TOLERANCE: f64 = 0.001;
 const ARC_MIN_RADIUS: f64 = 0.0001;
 const ARC_MAX_RADIUS: f64 = 500.0;
 
@@ -18,8 +18,9 @@ pub fn filter(program: &mut Program) {
     let initial_length = program.points.len();
     info!("Initial program length: {}", initial_length);
 
-    arc::filter_duplicate_arcs(program);
     linear::filter_collinear_lines(program);
+    arc::fit_arcs(program).unwrap();
+    arc::filter_duplicate_arcs(program);
 
     let filtered_length = program.points.len();
     info!("Filtered length: {} or a {:.2}% reduction", filtered_length, (1.0 - (filtered_length as f64 / initial_length as f64)) * 100.0);
@@ -38,6 +39,7 @@ fn remove_indices(program: &mut Program, indices: &Vec<usize>) {
             if i == indices.len() {
                 end = true;
             }
+            debug!("Removing point: {}", point);
         } else {
             points.push(*point);
         }

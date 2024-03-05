@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::fmt::{Debug, Display};
+use std::io::Write;
 use log::{debug, info};
 use logos::Logos;
 use vec_utils::vec3d::Vec3d;
@@ -230,5 +231,13 @@ impl Display for Point {
 
 pub fn vec_from_point(p1: &Point) -> Vec3d {
     Vec3d::new(p1.x, p1.y, p1.z)
+}
+
+pub fn vec_from_point_center(p1: &Point) -> Result<Vec3d, Box<dyn Error>> {
+    if p1.i == None || p1.j == None || p1.k == None {
+        Err("Arc point missing I, J, or K value")?
+    } else {
+        Ok(Vec3d::new(p1.i.unwrap(), p1.j.unwrap(), p1.k.unwrap()))
+    }
 }
 
