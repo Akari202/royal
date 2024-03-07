@@ -40,7 +40,13 @@ pub enum Token {
     #[token("G90", priority = 3)]
     AbsoluteDistanceMode,
     #[token("G91", priority = 3)]
-    IncrementalDistanceMode
+    IncrementalDistanceMode,
+    #[token("G17", priority = 3)]
+    XYPlaneSelection,
+    #[token("G18", priority = 3)]
+    XZPlaneSelection,
+    #[token("G19", priority = 3)]
+    YZPlaneSelection
 }
 
 impl fmt::Display for Token {

@@ -4,8 +4,8 @@ use crate::gcode::points::Program;
 mod linear;
 mod arc;
 
-const LINEAR_TOLERANCE: f64 = 0.001;
-const ARC_TOLERANCE: f64 = 0.001;
+const LINEAR_TOLERANCE: f64 = 0.0001;
+const ARC_TOLERANCE: f64 = 0.0001;
 const ARC_MIN_RADIUS: f64 = 0.0001;
 const ARC_MAX_RADIUS: f64 = 500.0;
 

@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::fmt::{Debug, Display};
+use std::fs::File;
 use std::io::Write;
 use log::{debug, info};
 use logos::Logos;
@@ -20,7 +21,8 @@ pub struct Point {
     pub i: Option<f64>,
     pub j: Option<f64>,
     pub k: Option<f64>,
-    pub point_type: PointType
+    pub point_type: PointType,
+    pub plane: Plane
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -38,6 +40,14 @@ enum DistanceMode {
     Incremental
 }
 
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum Plane {
+    XY,
+    YZ,
+    XZ,
+    None
+}
+
 impl Program {
     pub fn from_file(input: &str) -> Result<Self, Box<dyn Error>> {
         let perf_start = std::time::Instant::now();
@@ -45,6 +55,7 @@ impl Program {
         let mut program: Program = Program::new();
         let mut point: Point = Point::new();
         let mut distance_mode = DistanceMode::Absolute;
+        let mut plane_selection = Plane::None;
         loop {
             if let Some(token) = lex.next() {
                 if let Ok(token) = token {
@@ -53,7 +64,7 @@ impl Program {
                         StartBlock => { },
                         EndOfBlock => {
                             if point.is_initialized() {
-                                point.check()?;
+                                point.check(plane_selection)?;
                                 program.push(point);
                             }
                         },
@@ -86,7 +97,10 @@ impl Program {
                         CWCircularInterpolation => { point.set_type(PointType::ArcCW); },
                         CCWCircularInterpolation => { point.set_type(PointType::ArcCCW); },
                         AbsoluteDistanceMode => { distance_mode = DistanceMode::Absolute; },
-                        IncrementalDistanceMode => { distance_mode = DistanceMode::Incremental; }
+                        IncrementalDistanceMode => { distance_mode = DistanceMode::Incremental; },
+                        XYPlaneSelection => { plane_selection = Plane::XY; },
+                        XZPlaneSelection => { plane_selection = Plane::XZ; },
+                        YZPlaneSelection => { plane_selection = Plane::YZ; }
                     }
                 }
             } else {
@@ -95,6 +109,55 @@ impl Program {
         }
         info!("Parsing program took: {:?}", perf_start.elapsed());
         Ok(program)
+    }
+
+    pub fn to_file(&self, filename: &str) -> Result<(), Box<dyn Error>> {
+        let mut file = File::create(filename)?;
+        let mut previous_point = self.points[0];
+        // write the first point
+        writeln!(file, "%")?;
+        writeln!(file, "G90")?;
+        writeln!(
+            file,
+            "{} {} X{} Y{} Z{}",
+            previous_point.plane_gcode(),
+            previous_point.type_gcode(),
+            previous_point.x,
+            previous_point.y,
+            previous_point.z
+        )?;
+        let point_iter = self.points.iter().skip(1);
+        for point in point_iter {
+            if point.plane != previous_point.plane {
+                write!(file, "{} ", point.plane_gcode())?;
+            }
+            if point.point_type != previous_point.point_type {
+                write!(file, "{} ", point.type_gcode())?;
+            }
+            if point.x != previous_point.x {
+                write!(file, "X{} ", point.x)?;
+            }
+            if point.y != previous_point.y {
+                write!(file, "Y{} ", point.y)?;
+            }
+            if point.z != previous_point.z {
+                write!(file, "Z{} ", point.z)?;
+            }
+            if point.point_type == PointType::ArcCW || point.point_type == PointType::ArcCCW {
+                if point.i != Some(0.0) {
+                    write!(file, "I{} ", point.i.unwrap())?;
+                }
+                if point.j != Some(0.0) {
+                    write!(file, "J{} ", point.j.unwrap())?;
+                }
+                if point.k != Some(0.0) {
+                    write!(file, "K{} ", point.k.unwrap())?;
+                }
+            }
+            writeln!(file)?;
+            previous_point = *point;
+        }
+        Ok(())
     }
 }
 
@@ -117,7 +180,8 @@ impl Point {
             i: None,
             j: None,
             k: None,
-            point_type: PointType::None
+            point_type: PointType::None,
+            plane: Plane::None
         }
     }
 
@@ -129,7 +193,8 @@ impl Point {
             i: None,
             j: None,
             k: None,
-            point_type: PointType::None
+            point_type: PointType::None,
+            plane: Plane::None
         }
     }
 
@@ -150,7 +215,11 @@ impl Point {
         }
     }
 
-    fn check(&mut self) -> Result<(), Box<dyn Error>> {
+    fn check(&mut self, plane: Plane) -> Result<(), Box<dyn Error>> {
+        if plane == Plane::None {
+            Err("Plane not set")?
+        }
+        self.plane = plane;
         if self.i == None || self.j == None || self.k == None {
             if self.point_type == PointType::ArcCW || self.point_type == PointType::ArcCCW {
                 Err("Arc point missing I, J, or K value")?
@@ -160,9 +229,9 @@ impl Point {
                 Err("Point type not set")?
             }
         } else {
-            self.i = Some(self.x + self.i.unwrap());
-            self.j = Some(self.y + self.j.unwrap());
-            self.k = Some(self.z + self.k.unwrap());
+            // self.i = Some(self.x + self.i.unwrap());
+            // self.j = Some(self.y + self.j.unwrap());
+            // self.k = Some(self.z + self.k.unwrap());
             Ok(())
         }
     }
@@ -186,23 +255,43 @@ impl Point {
             Err("Arc point missing I, J, or K value")?
         } else {
             Ok((
-                (self.x - self.i.unwrap()).powi(2) +
-                    (self.y - self.j.unwrap()).powi(2) +
-                    (self.z - self.k.unwrap()).powi(2)
+                self.i.unwrap().powi(2) +
+                    self.j.unwrap().powi(2) +
+                    self.k.unwrap().powi(2)
             ).sqrt())
         }
     }
 
+    // WARN: this might be incorrect
     pub fn arc_center_distance(&self, other: &Point) -> Result<f64, Box<dyn Error>> {
         if self.i == None || self.j == None || self.k == None ||
             other.i == None || other.j == None || other.k == None {
             Err("Arc point missing I, J, or K value")?
         } else {
             Ok((
-                (self.i.unwrap() - other.i.unwrap()).powi(2) +
-                    (self.j.unwrap() - other.j.unwrap()).powi(2) +
-                    (self.k.unwrap() - other.k.unwrap()).powi(2)
+                (self.i.unwrap() + self.x - other.i.unwrap() + other.x).powi(2) +
+                (self.j.unwrap() + self.y - other.j.unwrap() + other.y).powi(2) +
+                (self.k.unwrap() + self.z - other.k.unwrap() + other.z).powi(2)
             ).sqrt())
+        }
+    }
+
+    fn type_gcode(&self) -> &str {
+        match self.point_type {
+            PointType::ArcCW => "G2",
+            PointType::ArcCCW => "G3",
+            PointType::Rapid => "G0",
+            PointType::Feed => "G1",
+            PointType::None => ""
+        }
+    }
+
+    fn plane_gcode(&self) -> &str {
+        match self.plane {
+            Plane::XY => "G17",
+            Plane::XZ => "G18",
+            Plane::YZ => "G19",
+            Plane::None => ""
         }
     }
 }
@@ -240,4 +329,5 @@ pub fn vec_from_point_center(p1: &Point) -> Result<Vec3d, Box<dyn Error>> {
         Ok(Vec3d::new(p1.i.unwrap(), p1.j.unwrap(), p1.k.unwrap()))
     }
 }
+
 

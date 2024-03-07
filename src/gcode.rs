@@ -1,6 +1,4 @@
 use logos::Logos;
-use crate::gcode::lex::Lexer;
-use crate::gcode::preprocessor::semicolon;
 
 mod lex;
 mod points;
@@ -19,6 +17,8 @@ fn test_lexer() {
     // let input = include_str!("../NC/Purple Worm Fewer supports+gcode - 4760012/files/PW_pt1.gcode");
     let mut program = points::Program::from_file(input).unwrap();
     filter::filter(&mut program);
+    // print program to stdout file
+    // program.to_file("./NC/test_arc_filtered.NC".into()).unwrap();
     // println!("{}", program);
     // println!("{}", program);
     // loop {
