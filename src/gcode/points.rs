@@ -117,17 +117,25 @@ impl Program {
         // write the first point
         writeln!(file, "%")?;
         writeln!(file, "G90")?;
-        writeln!(
+        write!(
             file,
-            "{} {} X{} Y{} Z{}",
+            "{} {} X{} Y{} Z{} ",
             previous_point.plane_gcode(),
             previous_point.type_gcode(),
             previous_point.x,
             previous_point.y,
             previous_point.z
         )?;
-        let point_iter = self.points.iter().skip(1);
-        for point in point_iter {
+        if previous_point.i.is_some() && previous_point.i != Some(0.0) {
+            write!(file, "I{} ", previous_point.i.unwrap())?;
+        }
+        if previous_point.j.is_some() && previous_point.j != Some(0.0) {
+            write!(file, "J{} ", previous_point.j.unwrap())?;
+        }
+        if previous_point.k.is_some() && previous_point.k != Some(0.0) {
+            write!(file, "K{} ", previous_point.k.unwrap())?;
+        }
+        for point in self.points.iter().skip(1) {
             if point.plane != previous_point.plane {
                 write!(file, "{} ", point.plane_gcode())?;
             }
@@ -221,19 +229,13 @@ impl Point {
         }
         self.plane = plane;
         if self.i == None || self.j == None || self.k == None {
-            if self.point_type == PointType::ArcCW || self.point_type == PointType::ArcCCW {
-                Err("Arc point missing I, J, or K value")?
-            } else if self.point_type == PointType::Rapid || self.point_type == PointType::Feed {
-                Ok(())
-            } else {
-                Err("Point type not set")?
+            match self.point_type {
+                PointType::ArcCW | PointType::ArcCCW => { Err("Arc point missing I, J, or K value")? },
+                PointType::Rapid | PointType::Feed => { return Ok(()); },
+                PointType::None => { Err("Point type not set")? }
             }
-        } else {
-            // self.i = Some(self.x + self.i.unwrap());
-            // self.j = Some(self.y + self.j.unwrap());
-            // self.k = Some(self.z + self.k.unwrap());
-            Ok(())
         }
+        Ok(())
     }
 
     fn is_initialized(&self) -> bool {
@@ -262,17 +264,32 @@ impl Point {
         }
     }
 
-    // WARN: this might be incorrect
     pub fn arc_center_distance(&self, other: &Point) -> Result<f64, Box<dyn Error>> {
         if self.i == None || self.j == None || self.k == None ||
             other.i == None || other.j == None || other.k == None {
             Err("Arc point missing I, J, or K value")?
         } else {
-            Ok((
-                (self.i.unwrap() + self.x - other.i.unwrap() + other.x).powi(2) +
-                (self.j.unwrap() + self.y - other.j.unwrap() + other.y).powi(2) +
-                (self.k.unwrap() + self.z - other.k.unwrap() + other.z).powi(2)
-            ).sqrt())
+            match self.plane {
+                Plane::XY => {
+                    Ok((
+                        (self.i.unwrap() - other.i.unwrap()).powi(2) +
+                            (self.j.unwrap() - other.j.unwrap()).powi(2)
+                    ).sqrt())
+                },
+                Plane::XZ => {
+                    Ok((
+                        (self.i.unwrap() - other.i.unwrap()).powi(2) +
+                            (self.k.unwrap() - other.k.unwrap()).powi(2)
+                    ).sqrt())
+                },
+                Plane::YZ => {
+                    Ok((
+                        (self.j.unwrap() - other.j.unwrap()).powi(2) +
+                            (self.k.unwrap() - other.k.unwrap()).powi(2)
+                    ).sqrt())
+                },
+                Plane::None => { Err("No plane selected")? }
+            }
         }
     }
 

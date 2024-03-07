@@ -10,9 +10,8 @@ pub fn filter_duplicate_arcs(program: &mut Program) {
     let perf_start = std::time::Instant::now();
     let mut pop_indices: Vec<usize> = Vec::new();
     let mut previous_point = program.points[0];
-    let mut point_iter = program.points.iter_mut().enumerate().skip(1);
-    for (i, point) in point_iter {
-        if point.point_type == previous_point.point_type {
+    for (i, point) in program.points.iter().enumerate().skip(1) {
+        if point.point_type == previous_point.point_type && point.plane == previous_point.plane {
             match point.point_type {
                 PointType::ArcCW | PointType::ArcCCW => {
                     if similar_circles(&previous_point, point) {
@@ -33,9 +32,8 @@ pub fn fit_arcs(program: &mut Program) -> Result<(), Box<dyn Error>> {
     let perf_start = std::time::Instant::now();
     let mut pop_indices: Vec<usize> = Vec::new();
     let mut previous_points = (program.points[0], program.points[1]);
-    let mut point_iter = program.points.iter_mut().enumerate().skip(2);
     let mut fitted_flag: bool = false;
-    for (i, point) in point_iter {
+    for (i, point) in program.points.iter_mut().enumerate().skip(2) {
         if fitted_flag {
             fitted_flag = false;
             previous_points.1 = *point;
@@ -45,7 +43,7 @@ pub fn fit_arcs(program: &mut Program) -> Result<(), Box<dyn Error>> {
             match point.point_type {
                 PointType::Feed | PointType::Rapid => {
                     // let fitted_arc = fit_arc_3d(&previous_points.0, &previous_points.1, point);
-                    let fitted_arc = fit_arc_planar(&previous_points.0, &previous_points.1, point);
+                    let mut fitted_arc = fit_arc_planar(&previous_points.0, &previous_points.1, point);
                     match fitted_arc {
                         Ok(fitted_arc) => {
                             let radius = fitted_arc.arc_radius()?;
@@ -59,7 +57,10 @@ pub fn fit_arcs(program: &mut Program) -> Result<(), Box<dyn Error>> {
                             let error1 = radius - point_to_line_distance(&center, &v1, &v2);
                             let error2 = radius - point_to_line_distance(&center, &v2, &v3);
                             if error1 < ARC_TOLERANCE && error2 < ARC_TOLERANCE{
+                                fitted_flag = true;
                                 pop_indices.push(i - 1);
+                                // pop_indices.push(i);
+                                *point = fitted_arc;
                                 previous_points.0 = fitted_arc;
                             }
                         },
@@ -76,10 +77,30 @@ pub fn fit_arcs(program: &mut Program) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+// NOTE: i realize now that this is basically the same as duplicate arc filtering
+// im keeping it for now just in case
+pub fn filter_zero_length_arcs(program: &mut Program) {
+    let perf_start = std::time::Instant::now();
+    let mut pop_indices: Vec<usize> = Vec::new();
+    let mut previous_point = &program.points[0];
+    for (i, point) in program.points.iter().enumerate().skip(1) {
+        if (point.point_type == PointType::ArcCW || point.point_type == PointType::ArcCCW) &&
+            previous_point.point_type == point.point_type {
+            if previous_point.distance(&point) < ARC_TOLERANCE {
+                pop_indices.push(i - 1);
+                continue;
+            }
+        }
+        previous_point = point;
+    }
+    remove_indices(program, &pop_indices);
+    info!("Zero length arc filtering took: {:?} and removed {} blocks", perf_start.elapsed(), pop_indices.len());
+}
+
 fn similar_circles(p1: &Point, p2: &Point) -> bool {
-    let radius_diff = p1.arc_radius().unwrap() - p2.arc_radius().unwrap();
-    let center_diff = p1.arc_center_distance(p2).unwrap();
-    (radius_diff.abs() + center_diff.abs()) < ARC_TOLERANCE
+    let radius_diff = (p1.arc_radius().unwrap() - p2.arc_radius().unwrap()).abs();
+    let center_diff = p1.arc_center_distance(p2).unwrap().abs();
+    (radius_diff + center_diff) < ARC_TOLERANCE
 }
 
 fn min_max_radius(program: &Program) -> (f64, f64) {
@@ -169,11 +190,12 @@ fn fit_arc_planar(p1: &Point, p2: &Point, p3: &Point) -> Result<Point, Box<dyn E
     let v2 = collapse_vec_to_xy_plane(&vec_from_point(p2), &plane);
     let v3 = collapse_vec_to_xy_plane(&vec_from_point(p3), &plane);
     // calculate if arc is CW or CCW
+    // WARN: might be backwards
     let cross = (v2 - v1).cross(&(v3 - v2));
     if cross.x + cross.y + cross.z < 0.0 {
-        point.set_type(PointType::ArcCW);
-    } else {
         point.set_type(PointType::ArcCCW);
+    } else {
+        point.set_type(PointType::ArcCW);
     }
     // fit circle
     let (_, center): (f64, Vec3d) = fit_circle_to_points_in_xy_plane(&v1, &v2, &v3);

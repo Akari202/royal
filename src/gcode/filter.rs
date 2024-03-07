@@ -19,8 +19,11 @@ pub fn filter(program: &mut Program) {
     info!("Initial program length: {}", initial_length);
 
     linear::filter_collinear_lines(program);
-    arc::fit_arcs(program).unwrap();
+    linear::filter_zero_length_lines(program);
     arc::filter_duplicate_arcs(program);
+    arc::filter_zero_length_arcs(program);
+    // arc::fit_arcs(program).unwrap();
+    // arc::filter_duplicate_arcs(program);
 
     let filtered_length = program.points.len();
     info!("Filtered length: {} or a {:.2}% reduction", filtered_length, (1.0 - (filtered_length as f64 / initial_length as f64)) * 100.0);

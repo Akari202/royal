@@ -18,7 +18,7 @@ fn test_lexer() {
     let mut program = points::Program::from_file(input).unwrap();
     filter::filter(&mut program);
     // print program to stdout file
-    // program.to_file("./NC/test_arc_filtered.NC".into()).unwrap();
+    program.to_file("./NC/test_arc_filtered.NC".into()).unwrap();
     // println!("{}", program);
     // println!("{}", program);
     // loop {
