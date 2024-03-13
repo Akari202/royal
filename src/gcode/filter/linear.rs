@@ -9,16 +9,12 @@ pub fn filter_collinear_lines(program: &mut Program) {
     let mut previous_points = (program.points[0], program.points[1]);
     for (i, point) in program.points.iter().enumerate().skip(2) {
         if point.point_type == previous_points.0.point_type && point.point_type == previous_points.1.point_type {
-            match point.point_type {
-                PointType::Rapid | PointType::Feed => {
-                    if collinear(&previous_points.0, &previous_points.1, point) {
-                        pop_indices.push(i - 1);
-                        previous_points.1 = *point;
-                        continue;
-                    }
-
-                },
-                _ => { }
+            if point.is_linear() {
+                if collinear(&previous_points.0, &previous_points.1, point) {
+                    pop_indices.push(i - 1);
+                    previous_points.1 = *point;
+                    continue;
+                }
             }
         }
         previous_points.0 = previous_points.1;
@@ -33,7 +29,7 @@ pub fn filter_zero_length_lines(program: &mut Program) {
     let mut pop_indices: Vec<usize> = Vec::new();
     let mut previous_point = &program.points[0];
     for (i, point) in program.points.iter().enumerate().skip(1) {
-        if point.point_type == PointType::Rapid || point.point_type == PointType::Feed {
+        if point.is_linear() {
             if previous_point.point_type == point.point_type {
                 if previous_point.distance(&point) < LINEAR_TOLERANCE {
                     pop_indices.push(i - 1);

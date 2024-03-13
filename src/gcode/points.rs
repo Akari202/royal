@@ -180,6 +180,7 @@ impl Program {
 }
 
 impl Point {
+    // NOTE: default plane is assumed to be XY
     pub fn new() -> Self {
         Self {
             x: 0.0,
@@ -189,7 +190,7 @@ impl Point {
             j: None,
             k: None,
             point_type: PointType::None,
-            plane: Plane::None
+            plane: Plane::XY
         }
     }
 
@@ -310,6 +311,20 @@ impl Point {
             Plane::YZ => "G19",
             Plane::None => ""
         }
+    }
+
+    pub fn is_arc(&self) -> bool {
+        self.point_type == PointType::ArcCW || self.point_type == PointType::ArcCCW
+    }
+
+    pub fn is_linear(&self) -> bool {
+        self.point_type == PointType::Rapid || self.point_type == PointType::Feed
+    }
+
+    pub fn update_xyz(&mut self, other: &Point) {
+        self.x = other.x;
+        self.y = other.y;
+        self.z = other.z;
     }
 }
 

@@ -1,9 +1,9 @@
 use std::error::Error;
-use log::info;
+use log::{debug, info};
 use vec_utils::matrix::matrix4x4;
 use vec_utils::quat::Quat;
 use vec_utils::vec3d::Vec3d;
-use crate::gcode::filter::{ARC_MAX_RADIUS, ARC_MIN_RADIUS, ARC_TOLERANCE, linear, remove_indices};
+use crate::gcode::filter::{ARC_MAX_RADIUS, ARC_MIN_RADIUS, ARC_TOLERANCE, linear, remove_and_update_indices, remove_indices};
 use crate::gcode::points::{scalar_triple_product, Point, PointType, Program, vec_from_point, vec_from_point_center, Plane};
 
 pub fn filter_duplicate_arcs(program: &mut Program) {
@@ -12,14 +12,11 @@ pub fn filter_duplicate_arcs(program: &mut Program) {
     let mut previous_point = program.points[0];
     for (i, point) in program.points.iter().enumerate().skip(1) {
         if point.point_type == previous_point.point_type && point.plane == previous_point.plane {
-            match point.point_type {
-                PointType::ArcCW | PointType::ArcCCW => {
-                    if similar_circles(&previous_point, point) {
-                        pop_indices.push(i - 1);
-                        continue;
-                    }
-                },
-                _ => { }
+            if point.is_arc() {
+                if similar_circles(&previous_point, point) {
+                    pop_indices.push(i - 1);
+                    continue;
+                }
             }
         }
         previous_point = *point;
@@ -40,34 +37,31 @@ pub fn fit_arcs(program: &mut Program) -> Result<(), Box<dyn Error>> {
             continue;
         }
         if previous_points.1.point_type == point.point_type {
-            match point.point_type {
-                PointType::Feed | PointType::Rapid => {
-                    // let fitted_arc = fit_arc_3d(&previous_points.0, &previous_points.1, point);
-                    let mut fitted_arc = fit_arc_planar(&previous_points.0, &previous_points.1, point);
-                    match fitted_arc {
-                        Ok(fitted_arc) => {
-                            let radius = fitted_arc.arc_radius()?;
-                            if radius < ARC_MIN_RADIUS || radius > ARC_MAX_RADIUS {
-                                continue;
-                            }
-                            let v1 = vec_from_point(&previous_points.0);
-                            let v2 = vec_from_point(&previous_points.1);
-                            let v3 = vec_from_point(point);
-                            let center = vec_from_point_center(&fitted_arc)?;
-                            let error1 = radius - point_to_line_distance(&center, &v1, &v2);
-                            let error2 = radius - point_to_line_distance(&center, &v2, &v3);
-                            if error1 < ARC_TOLERANCE && error2 < ARC_TOLERANCE{
-                                fitted_flag = true;
-                                pop_indices.push(i - 1);
-                                // pop_indices.push(i);
-                                *point = fitted_arc;
-                                previous_points.0 = fitted_arc;
-                            }
-                        },
-                        Err(_) => { }
-                    }
-                },
-                _ => { }
+            if point.is_linear() {
+                // let fitted_arc = fit_arc_3d(&previous_points.0, &previous_points.1, point);
+                let mut fitted_arc = fit_arc_planar(&previous_points.0, &previous_points.1, point);
+                match fitted_arc {
+                    Ok(fitted_arc) => {
+                        let radius = fitted_arc.arc_radius()?;
+                        if radius < ARC_MIN_RADIUS || radius > ARC_MAX_RADIUS {
+                            continue;
+                        }
+                        let v1 = vec_from_point(&previous_points.0);
+                        let v2 = vec_from_point(&previous_points.1);
+                        let v3 = vec_from_point(point);
+                        let center = vec_from_point_center(&fitted_arc)?;
+                        let error1 = radius - point_to_line_distance(&center, &v1, &v2);
+                        let error2 = radius - point_to_line_distance(&center, &v2, &v3);
+                        if error1 < ARC_TOLERANCE && error2 < ARC_TOLERANCE{
+                            fitted_flag = true;
+                            pop_indices.push(i - 1);
+                            // pop_indices.push(i);
+                            *point = fitted_arc;
+                            previous_points.0 = fitted_arc;
+                        }
+                    },
+                    Err(_) => { }
+                }
             }
         }
         previous_points = (previous_points.1, *point);
@@ -84,8 +78,7 @@ pub fn filter_zero_length_arcs(program: &mut Program) {
     let mut pop_indices: Vec<usize> = Vec::new();
     let mut previous_point = &program.points[0];
     for (i, point) in program.points.iter().enumerate().skip(1) {
-        if (point.point_type == PointType::ArcCW || point.point_type == PointType::ArcCCW) &&
-            previous_point.point_type == point.point_type {
+        if point.is_arc() && previous_point.point_type == point.point_type {
             if previous_point.distance(&point) < ARC_TOLERANCE {
                 pop_indices.push(i - 1);
                 continue;
@@ -95,6 +88,38 @@ pub fn filter_zero_length_arcs(program: &mut Program) {
     }
     remove_indices(program, &pop_indices);
     info!("Zero length arc filtering took: {:?} and removed {} blocks", perf_start.elapsed(), pop_indices.len());
+}
+
+pub fn filter_collinear_arcs(program: &mut Program) {
+    let perf_start = std::time::Instant::now();
+    let mut pop_indices: Vec<usize> = Vec::new();
+    let mut previous_points = (program.points[0], program.points[1]);
+    for (i, point) in program.points.iter().enumerate().skip(2) {
+        if previous_points.1.is_arc() {
+            let center = vec_from_point_center(&previous_points.1).unwrap();
+            let radius = previous_points.1.arc_radius().unwrap();
+            // WARN: there are cases where this is incorrect
+            if point.is_arc() {
+                let first_error = radius - point_to_line_distance(&center, &vec_from_point(&previous_points.1), &vec_from_point(&point));
+                let second_error = point.arc_radius().unwrap() -
+                    point_to_line_distance(
+                        &vec_from_point_center(&point).unwrap(),
+                        &vec_from_point(&previous_points.1),
+                        &vec_from_point(&point)
+                    );
+                let error = first_error - second_error;
+                debug!("Collinear arc error: {}", error);
+                if error < ARC_TOLERANCE {
+                    pop_indices.push(i);
+                    continue;
+                }
+            }
+        }
+        previous_points.0 = previous_points.1;
+        previous_points.1 = *point;
+    }
+    remove_and_update_indices(program, &pop_indices);
+    info!("Collinear arc filtering took: {:?} and removed {} blocks", perf_start.elapsed(), pop_indices.len());
 }
 
 fn similar_circles(p1: &Point, p2: &Point) -> bool {
@@ -168,8 +193,7 @@ fn fit_arc_3d(p1: &Point, p2: &Point, p3: &Point) -> Result<Point, Box<dyn Error
 }
 
 fn fit_arc_planar(p1: &Point, p2: &Point, p3: &Point) -> Result<Point, Box<dyn Error>> {
-    if p2.point_type != PointType::Rapid && p2.point_type != PointType::Feed ||
-        p3.point_type != PointType::Rapid && p3.point_type != PointType::Feed {
+    if p2.is_linear() || p3.is_linear() {
         Err("Middle and end points must be a rapid or feed motion")?
     }
     if linear::collinear(p1, p2, p3) {
