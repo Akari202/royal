@@ -10,16 +10,20 @@ pub fn filter_duplicate_arcs(program: &mut Program) {
     let perf_start = std::time::Instant::now();
     let mut pop_indices: Vec<usize> = Vec::new();
     let mut previous_point = program.points[0];
+    let mut accumulated_error = 0.0;
     for (i, point) in program.points.iter().enumerate().skip(1) {
         if point.point_type == previous_point.point_type && point.plane == previous_point.plane {
             if point.is_arc() {
-                if similar_circles(&previous_point, point) {
+                let (similar, error) = similar_circles(&previous_point, point, accumulated_error);
+                if similar {
+                    accumulated_error += error;
                     pop_indices.push(i - 1);
                     continue;
                 }
             }
         }
         previous_point = *point;
+        accumulated_error = 0.0;
     }
     remove_indices(program, &pop_indices);
     info!("Duplicate arc filtering took: {:?} and removed {} blocks", perf_start.elapsed(), pop_indices.len());
@@ -122,17 +126,19 @@ pub fn filter_collinear_arcs(program: &mut Program) {
     info!("Collinear arc filtering took: {:?} and removed {} blocks", perf_start.elapsed(), pop_indices.len());
 }
 
-fn similar_circles(p1: &Point, p2: &Point) -> bool {
+/// Returns if they are similar and the total error
+fn similar_circles(p1: &Point, p2: &Point, accumulated_error: f64) -> (bool, f64) {
     let radius_diff = (p1.arc_radius().unwrap() - p2.arc_radius().unwrap()).abs();
     let center_diff = p1.arc_center_distance(p2).unwrap().abs();
-    (radius_diff + center_diff) < ARC_TOLERANCE
+    let error = radius_diff + center_diff + accumulated_error;
+    (error < ARC_TOLERANCE, error)
 }
 
 fn min_max_radius(program: &Program) -> (f64, f64) {
     let mut min_radius = f64::MAX;
     let mut max_radius = f64::MIN;
     for point in program.points.iter() {
-        if let Some(i) = point.i {
+        if let Some(_i) = point.i {
             let radius = point.arc_radius().unwrap();
             if radius < min_radius {
                 min_radius = radius;

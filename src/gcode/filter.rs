@@ -1,11 +1,14 @@
 use log::{debug, info, warn};
+use vec_utils::angle::AngleRadians;
+use vec_utils::vec3d::Vec3d;
+use crate::gcode::transform::{rotate_program, scale_program, translate_program};
 use crate::gcode::points::{Point, Program};
 
 mod linear;
 mod arc;
 
-const LINEAR_TOLERANCE: f64 = 0.0001 * 25.4;
-const ARC_TOLERANCE: f64 = 0.0001 * 25.4;
+const LINEAR_TOLERANCE: f64 = 0.0001;
+const ARC_TOLERANCE: f64 = 0.0001;
 const ARC_MIN_RADIUS: f64 = 0.0001;
 const ARC_MAX_RADIUS: f64 = 500.0;
 
@@ -23,6 +26,11 @@ pub fn filter(program: &mut Program) {
     arc::filter_duplicate_arcs(program);
     arc::filter_collinear_arcs(program);
     arc::filter_zero_length_arcs(program);
+
+    rotate_program(program, AngleRadians::quarter_pi(), Vec3d::k(), Vec3d::new(3.0, 4.0, 0.0));
+    translate_program(program, Vec3d { x: 3.0, y: 0.0, z: 5.0 });
+    scale_program(program, 2.0);
+
     // arc::fit_arcs(program).unwrap();
     // arc::filter_duplicate_arcs(program);
 

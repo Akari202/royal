@@ -5,6 +5,7 @@ mod lex;
 mod points;
 mod filter;
 mod preprocessor;
+mod transform;
 
 pub fn test() {
     test_lexer();

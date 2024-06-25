@@ -180,7 +180,6 @@ impl Program {
 }
 
 impl Point {
-    // NOTE: default plane is assumed to be XY
     pub fn new() -> Self {
         Self {
             x: 0.0,
@@ -190,7 +189,7 @@ impl Point {
             j: None,
             k: None,
             point_type: PointType::None,
-            plane: Plane::XY
+            plane: Plane::None
         }
     }
 
