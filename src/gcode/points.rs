@@ -8,6 +8,17 @@ use vec_utils::vec3d::Vec3d;
 use crate::gcode::lex::tokens::Token;
 use crate::gcode::lex::tokens::Token::*;
 
+// Plan:
+// Change program to being a collection of toolpaths
+// a toolpath contains what is currently a program and some additional information
+// i cant decide, should a toolpath have a fixed spindle speed or should i accomodate elijah's
+// wierd programing habits. spindle speed will be stored as a single i32 with CCW rotations taken to be +
+// toolpaths will have  a type of drilling, milling or whatever
+//
+// Output will only be touched later
+//
+// progress
+//
 #[derive(Debug, Clone)]
 pub struct Program {
     pub points: Vec<Point>
@@ -49,6 +60,7 @@ pub enum Plane {
 }
 
 impl Program {
+    // TODO: make this accept a stream input
     pub fn from_file(input: &str) -> Result<Self, Box<dyn Error>> {
         let perf_start = std::time::Instant::now();
         let mut lex = Token::lexer(input);
@@ -61,45 +73,45 @@ impl Program {
                 if let Ok(token) = token {
                     debug!("Token: {}", token);
                     match token {
-                        StartBlock => { },
+                        StartBlock => { }
                         EndOfBlock => {
                             if point.is_initialized() {
                                 point.check(plane_selection)?;
                                 program.push(point);
                             }
-                        },
+                        }
                         XPoint(x) => {
                             if distance_mode == DistanceMode::Absolute {
                                 point.x = x;
                             } else {
                                 point.x += x;
                             }
-                        },
+                        }
                         YPoint(y) => {
                             if distance_mode == DistanceMode::Absolute {
                                 point.y = y;
                             } else {
                                 point.y += y;
                             }
-                        },
+                        }
                         ZPoint(z) => {
                             if distance_mode == DistanceMode::Absolute {
                                 point.z = z;
                             } else {
                                 point.z += z;
                             }
-                        },
-                        IPoint(i) => { point.i = Some(i); },
-                        JPoint(j) => { point.j = Some(j); },
-                        KPoint(k) => { point.k = Some(k); },
-                        RapidPositioning => { point.set_type(PointType::Rapid); },
-                        LinearInterpolation => { point.set_type(PointType::Feed); },
-                        CWCircularInterpolation => { point.set_type(PointType::ArcCW); },
-                        CCWCircularInterpolation => { point.set_type(PointType::ArcCCW); },
-                        AbsoluteDistanceMode => { distance_mode = DistanceMode::Absolute; },
-                        IncrementalDistanceMode => { distance_mode = DistanceMode::Incremental; },
-                        XYPlaneSelection => { plane_selection = Plane::XY; },
-                        XZPlaneSelection => { plane_selection = Plane::XZ; },
+                        }
+                        IPoint(i) => { point.i = Some(i); }
+                        JPoint(j) => { point.j = Some(j); }
+                        KPoint(k) => { point.k = Some(k); }
+                        RapidPositioning => { point.set_type(PointType::Rapid); }
+                        LinearInterpolation => { point.set_type(PointType::Feed); }
+                        CWCircularInterpolation => { point.set_type(PointType::ArcCW); }
+                        CCWCircularInterpolation => { point.set_type(PointType::ArcCCW); }
+                        AbsoluteDistanceMode => { distance_mode = DistanceMode::Absolute; }
+                        IncrementalDistanceMode => { distance_mode = DistanceMode::Incremental; }
+                        XYPlaneSelection => { plane_selection = Plane::XY; }
+                        XZPlaneSelection => { plane_selection = Plane::XZ; }
                         YZPlaneSelection => { plane_selection = Plane::YZ; }
                     }
                 }

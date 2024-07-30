@@ -38,6 +38,7 @@ pub fn filter(program: &mut Program) {
     info!("Filtered length: {} or a {:.2}% reduction", filtered_length, (1.0 - (filtered_length as f64 / initial_length as f64)) * 100.0);
 }
 
+// The reaason this does not use filter is because i didnt know about that
 fn remove_indices(program: &mut Program, indices: &Vec<usize>) {
     if indices.is_empty() {
         return;

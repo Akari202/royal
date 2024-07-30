@@ -10,6 +10,7 @@ use logos::Logos;
 pub enum Token {
     #[token(r"%", priority = 3)]
     StartBlock,
+    #[token(";\n", priority = 3)]
     #[token("\n", priority = 3)]
     #[token(r";", priority = 3)]
     EndOfBlock,
