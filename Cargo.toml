@@ -1,20 +1,22 @@
 [package]
 name = "royal"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Akari Harada <akaritwo0two@gmail.com>"]
 repository = "https://github.com/Akari202/royal"
 license = "GPL-3"
 
 [dependencies]
-rayon = "1.8.0"
+rayon = "1.10.0"
 nom = "7.1.2"
 logos = "0.14.0"
-rand = "0.8.5"
+rand = "0.9.0-alpha.2"
 lalrpop-util = "0.20.0"
-log = "0.4.21"
-env_logger = "0.11.2"
-vec-utils = { version = "0.1.0", path = "../vec-utils" }
+log = "0.4.22"
+env_logger = "0.11.5"
+vec-utils = { version = "0.1.1", path = "../vec-utils" }
+nestify = "0.3.3"
+thiserror = "1.0.63"
 
 [build-dependencies]
 lalrpop = "0.20.0"

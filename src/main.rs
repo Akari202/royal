@@ -10,6 +10,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         })
         .init();
     // env_logger::init();
-    gcode::test();
+    gcode::test()?;
     Ok(())
 }
