@@ -129,7 +129,7 @@ impl Program {
                 if let Ok(token) = token {
                     debug!("Token: {:?}", token);
                     match token {
-                        EndOfBlock => { }
+                        // EndOfBlock => { }
                         StartBlock => { }
                         ONumber(num) => {
                             program.operation_number = num;
@@ -154,34 +154,38 @@ impl Program {
                 if let Ok(token) = token {
                     debug!("Token: {:?}", token);
                     match token {
+                        StartBlock => {
+                            break 'Toolpath;
+                        }
                         EndOfBlock => {}
+                        Comment => {}
                         AAxisPoint(a) => {
                             match point.multiaxis_point {
-                                Some(value) => {
-                                    value[0] = a;
+                                Some(mut value) => {
+                                    value.x = a;
                                 }
                                 None => {
-                                    point.multiaxis_point = Some(Vec3d::new(a, 0.0, 0.0))
+                                    point.multiaxis_point = Some(Vec3d::new(a, 0.0, 0.0));
                                 }
                             }
                         }
                         BAxisPoint(b) => {
                             match point.multiaxis_point {
-                                Some(value) => {
-                                    value[1] = b;
+                                Some(mut value) => {
+                                    value.y = b;
                                 }
                                 None => {
-                                    point.multiaxis_point = Some(Vec3d::new(0.0, b, 0.0))
+                                    point.multiaxis_point = Some(Vec3d::new(0.0, b, 0.0));
                                 }
                             }
                         }
                         CAxisPoint(c) => {
                             match point.multiaxis_point {
-                                Some(value) => {
-                                    value[2] = c;
+                                Some(mut value) => {
+                                    value.z = c;
                                 }
                                 None => {
-                                    point.multiaxis_point = Some(Vec3d::new(0.0, 0.0, c))
+                                    point.multiaxis_point = Some(Vec3d::new(0.0, 0.0, c));
                                 }
                             }
                         }
@@ -193,13 +197,15 @@ impl Program {
                         JValue(_) => {}
                         KValue(_) => {}
                         LValue(_) => {}
-                        LineNumber(_) => {}
-                        ONumber(_) => {}
+                        LineNumber(n) => {
+                            point.line_number = Some(n);
+                        }
+                        // ONumber(_) => {}
                         PValue(_) => {}
                         QValue(_) => {}
                         RValue(_) => {}
                         SpindleSpeed(_) => {}
-                        ToolNumber(_) => {}
+                        ToolNumber(t) => {}
                         XPoint(_) => {}
                         YPoint(_) => {}
                         ZPoint(_) => {}
@@ -214,6 +220,10 @@ impl Program {
                         YZPlaneSelection => {}
                         UnitsInches => {}
                         UnitsMetric => {}
+                        ReturnMachineZero => {}
+                        CancelCutterCompensation => {}
+                        ToolLengthCompensation => {}
+                        CancelToolLengthCompensation => {}
                         G54WorkCoordinateSystem => {}
                         G55WorkCoordinateSystem => {}
                         G56WorkCoordinateSystem => {}
@@ -222,11 +232,20 @@ impl Program {
                         G59WorkCoordinateSystem => {}
                         CancelCannedCycle => {}
                         DrillCannedCycle => {}
-                        AbsoluteDistanceMode => {}
-                        IncrementalDistanceMode => {}
+                        PeckDrillCannedCycle => {}
+                        AbsoluteDistanceMode => {
+                            distance_mode = DistanceMode::Absolute;
+                        }
+                        IncrementalDistanceMode => {
+                            distance_mode = DistanceMode::Incremental;
+                        }
+                        InitialPointReturn => {}
+                        RPlaneReturn => {}
                         ProgramStop => {}
                         OptionalStop => {}
-                        ProgramEnd => {}
+                        ProgramEnd => {
+                            break 'Toolpath;
+                        }
                         SpindleOnCW => {}
                         SpindleOnCCW => {}
                         SpindleStop => {}

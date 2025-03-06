@@ -15,6 +15,8 @@ pub enum Token {
     #[token("\n", priority = 3)]
     #[token(r";", priority = 3)]
     EndOfBlock,
+    #[regex(r"\(([^)]+)\)")]
+    Comment,
 
     #[regex(r"A(?&float)", |lex| lex.slice()[1..].parse::<f64>().map_err(|_| ()), priority = 3)]
     AAxisPoint(f64),
@@ -87,6 +89,14 @@ pub enum Token {
     UnitsInches,
     #[token("G21", priority = 3)]
     UnitsMetric,
+    #[token("G28", priority = 3)]
+    ReturnMachineZero,
+    #[token("G40", priority = 3)]
+    CancelCutterCompensation,
+    #[token("G43", priority = 3)]
+    ToolLengthCompensation,
+    #[token("G49", priority = 3)]
+    CancelToolLengthCompensation,
     #[token("G54", priority = 3)]
     G54WorkCoordinateSystem,
     #[token("G55", priority = 3)]
@@ -103,10 +113,16 @@ pub enum Token {
     CancelCannedCycle,
     #[token("G81", priority = 3)]
     DrillCannedCycle,
+    #[token("G83", priority = 3)]
+    PeckDrillCannedCycle,
     #[token("G90", priority = 3)]
     AbsoluteDistanceMode,
     #[token("G91", priority = 3)]
     IncrementalDistanceMode,
+    #[token("G98", priority = 3)]
+    InitialPointReturn,
+    #[token("G99", priority = 3)]
+    RPlaneReturn,
 
     #[token("M0", priority = 3)]
     #[token("M00", priority = 3)]
@@ -137,10 +153,6 @@ pub enum Token {
     CoolantOff,
     #[token("M30", priority = 3)]
     ProgramEndReset
-}
-
-impl Token {
-
 }
 
 impl fmt::Display for Token {
