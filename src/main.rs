@@ -1,7 +1,8 @@
 use std::error::Error;
 use std::io::Write;
 
-mod gcode;
+mod royal;
+mod ast;
 
 fn main() -> Result<(), Box<dyn Error>> {
     env_logger::builder()
@@ -10,6 +11,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         })
         .init();
     // env_logger::init();
-    gcode::test()?;
+    royal::test()?;
     Ok(())
 }

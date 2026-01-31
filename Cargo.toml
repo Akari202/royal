@@ -8,17 +8,17 @@ license = "GPL-3"
 
 [dependencies]
 rayon = "1.10.0"
-nom = "7.1.2"
-logos = "0.14.0"
-rand = "0.9.0-alpha.2"
-lalrpop-util = "0.20.0"
-log = "0.4.22"
-env_logger = "0.11.5"
-vec-utils = { version = "0.1.1", path = "../vec-utils" }
+nom = "7.1.3"
+logos = "0.14.4"
+rand = "0.9.0"
+lalrpop-util = "0.22.1"
+log = "0.4.26"
+env_logger = "0.11.6"
+vec-utils = { version = "0.1.2", path = "../vec-utils" }
 nestify = "0.3.3"
-thiserror = "1.0.63"
+thiserror = "1.0.69"
 
 [build-dependencies]
-lalrpop = "0.20.0"
+lalrpop = { version = "0.22.1", features = ["lexer", "unicode"] }
 
 
